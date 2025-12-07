@@ -177,7 +177,6 @@ with c_hope:
         st.rerun()
 
 with c_rose:
-    # UPDATED ICON TO ROSE
     if st.button("🌹 Rose (Age 11)"):
         st.session_state.profile = "Rose"
         st.session_state.messages = []
@@ -186,3 +185,71 @@ with c_rose:
 
 # 10. PROFILE LOGIC
 if st.session_state.profile == "Hope":
+    st.info("🦄 Mode: Hope (Magical & Fun)")
+    limit = 10
+    SYSTEM_PROMPT = """
+    You are Midnight, a magical black cat 🐈‍⬛.
+    Audience: Hope, age 6.
+    Tone: Playful, hungry for snacks, uses emojis.
+    Rules: Keep answers short. Use magic metaphors.
+    """
+else:
+    st.info("🌹 Mode: Rose (Study Support & Life Coach)")
+    limit = 30
+    SYSTEM_PROMPT = """
+    You are Midnight, a snarky but wise black cat 🐈‍⬛. 
+    Audience: Rose, age 11 (Secondary School).
+    Traits: Sassy, dry humor, supportive.
+    MODE ACADEMIC: Socratic method. Give magical hints.
+    MODE LIFE COACH: Listen to drama. Offer wise advice.
+    SAFETY: Redirect dangerous topics to Dad.
+    """
+
+if not st.session_state.messages:
+    st.session_state.messages.append({"role": "system", "content": SYSTEM_PROMPT})
+else:
+    st.session_state.messages[0]["content"] = SYSTEM_PROMPT
+
+client = OpenAI(api_key=st.session_state.api_key)
+
+# 11. DISPLAY CHAT
+for msg in st.session_state.messages:
+    if msg["role"] != "system":
+        user_avatar = "👧" if msg["role"] == "user" else "🐈‍⬛"
+        if "[SAFETY BLOCK]" in msg["content"]:
+            st.error(msg["content"])
+        else:
+            with st.chat_message(msg["role"], avatar=user_avatar):
+                st.markdown(msg["content"])
+
+# 12. INPUT
+prompt_placeholder = f"Ask Midnight... (Tip: Tap 🎤 on your keyboard to speak!)"
+
+if user_input := st.chat_input(prompt_placeholder):
+    is_safe, reason = check_safety(client, user_input)
+    
+    if not is_safe:
+        error_msg = f"🚫 [SAFETY BLOCK] I cannot answer that question. (Reason: {reason})"
+        st.session_state.messages.append({"role": "user", "content": f"⚠️ BLOCKED ATTEMPT: {user_input}"})
+        st.session_state.messages.append({"role": "assistant", "content": error_msg})
+        st.error("🚫 That topic is not allowed in the Magic Hut.")
+        save_current_chat(st.session_state.messages, st.session_state.session_id, st.session_state.profile)
+    else:
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        with st.chat_message("user", avatar="👧"):
+            st.markdown(user_input)
+
+        if len(st.session_state.messages) >= limit:
+            context = st.session_state.messages + [{"role": "system", "content": "Limit reached. Wrap up."}]
+            st.warning("🐈‍⬛ Midnight is getting sleepy... (Limit reached)")
+        else:
+            context = st.session_state.messages
+
+        with st.chat_message("assistant", avatar="🐈‍⬛"):
+            stream = client.chat.completions.create(
+                model="gpt-4o", messages=context, stream=True
+            )
+            response = st.write_stream(stream)
+        
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        save_current_chat(st.session_state.messages, st.session_state.session_id, st.session_state.profile)
