@@ -11,16 +11,13 @@ st.set_page_config(page_title="Midnight's Magic Hut", page_icon="🐈‍⬛", la
 # 2. MAGIC UI (CSS)
 st.markdown("""
 <style>
-    /* Main Background */
     .stApp {
         background: linear-gradient(to bottom right, #2e1a47, #0e0b16);
         color: #e0d4fc;
     }
-    
-    /* UNIVERSAL BUTTON STYLE - All buttons are now identical */
     .stButton > button {
         width: 100%;
-        height: 60px; /* Fixed pixel height for perfect alignment */
+        height: 60px;
         border-radius: 12px;
         font-size: 18px;
         font-weight: bold;
@@ -35,13 +32,7 @@ st.markdown("""
         border-color: #d8b4fe;
         transform: scale(1.02);
     }
-
-    /* FIX: Don't hide the header, just make it transparent so the 'Open Sidebar' arrow stays visible */
-    header {
-        background: rgba(0,0,0,0) !important;
-    }
-    
-    /* Adjust top spacing */
+    header {background: rgba(0,0,0,0) !important;}
     .block-container {padding-top: 1rem;}
 </style>
 """, unsafe_allow_html=True)
@@ -52,7 +43,6 @@ HISTORY_FILE = "midnight_history.json"
 def load_all_history():
     if not os.path.exists(HISTORY_FILE):
         return {"Hope": [], "Rose": []}
-    
     with open(HISTORY_FILE, "r") as f:
         try:
             data = json.load(f)
@@ -64,14 +54,12 @@ def load_all_history():
 def save_current_chat(messages, session_id, user_name):
     data = load_all_history()
     user_history = data.get(user_name, [])
-    
     found = False
     for session in user_history:
         if session.get("id") == session_id:
             session["messages"] = messages
             found = True
             break
-    
     if not found:
         new_session = {
             "id": session_id,
@@ -79,15 +67,13 @@ def save_current_chat(messages, session_id, user_name):
             "messages": messages
         }
         user_history.append(new_session)
-    
     data[user_name] = user_history
     with open(HISTORY_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
 def delete_user_history(user_name):
-    """Only deletes the history key for the specific user"""
     data = load_all_history()
-    data[user_name] = [] # Wipe only this user
+    data[user_name] = [] 
     with open(HISTORY_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
@@ -95,13 +81,13 @@ def delete_user_history(user_name):
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 if "profile" not in st.session_state:
-    st.session_state.profile = "Rose" # Default to eldest
+    st.session_state.profile = "Rose"
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 if "confirm_delete" not in st.session_state:
     st.session_state.confirm_delete = False
 
-# 5. SIDEBAR
+# 5. SIDEBAR (SECURITY GATE)
 with st.sidebar:
     st.header("🔮 Wizard Settings")
     if "api_key" not in st.session_state:
@@ -110,6 +96,18 @@ with st.sidebar:
     if api_input:
         st.session_state.api_key = api_input
 
+# 6. SECURITY STOP - NOTHING LOADS PAST HERE WITHOUT KEY
+if not st.session_state.api_key:
+    st.title("🐈‍⬛ Midnight the Mentor")
+    st.warning("⚠️ The crystal ball is locked. Please enter the Password (API Key) in the sidebar to reveal the app.")
+    st.stop()
+
+# =========================================================
+# EVERYTHING BELOW THIS LINE IS NOW HIDDEN FROM STRANGERS
+# =========================================================
+
+# 7. AUTHENTICATED SIDEBAR CONTENT (History & Tools)
+with st.sidebar:
     st.markdown("---")
     
     # HISTORY VIEWER
@@ -133,10 +131,16 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # DELETE BUTTON LOGIC
+    # BUTTON STACK
     if not st.session_state.confirm_delete:
         if st.button("🗑️ Burn Scrolls"):
             st.session_state.confirm_delete = True
+            st.rerun()
+        if st.button("🧹 New Chat"):
+            if len(st.session_state.messages) > 1:
+                save_current_chat(st.session_state.messages, st.session_state.session_id, st.session_state.profile)
+            st.session_state.messages = []
+            st.session_state.session_id = str(uuid.uuid4())
             st.rerun()
     else:
         st.warning(f"⚠️ Confirm? This deletes ONLY {current_user}'s history.")
@@ -154,24 +158,12 @@ with st.sidebar:
                 st.session_state.confirm_delete = False
                 st.rerun()
 
-    # NEW CHAT BUTTON
-    if not st.session_state.confirm_delete:
-        if st.button("🧹 New Chat"):
-            if len(st.session_state.messages) > 1:
-                save_current_chat(st.session_state.messages, st.session_state.session_id, st.session_state.profile)
-            st.session_state.messages = []
-            st.session_state.session_id = str(uuid.uuid4())
-            st.rerun()
-
-# 6. MAIN UI
+# 8. MAIN UI
 st.title("🐈‍⬛ Midnight the Mentor")
 
-# --- LEFT ALIGN FIX ---
-# [1, 1, 5] means 2 small columns + 1 huge spacer column.
 c_hope, c_rose, c_space = st.columns([1, 1, 5])
 
 with c_hope:
-    # Hope is now 6
     if st.button("🦄 Hope (Age 6)"):
         st.session_state.profile = "Hope"
         st.session_state.messages = []
@@ -179,14 +171,13 @@ with c_hope:
         st.rerun()
 
 with c_rose:
-    # Rose is now 11
     if st.button("🦅 Rose (Age 11)"):
         st.session_state.profile = "Rose"
         st.session_state.messages = []
         st.session_state.session_id = str(uuid.uuid4())
         st.rerun()
 
-# 7. PROFILE LOGIC (CORRECTED AGES)
+# 9. PROFILE LOGIC
 if st.session_state.profile == "Hope":
     st.info("🦄 Mode: Hope (Magical & Fun)")
     limit = 10
@@ -208,28 +199,22 @@ else:
     SAFETY: Redirect dangerous topics to Dad.
     """
 
-# Ensure System Prompt is correct
 if not st.session_state.messages:
     st.session_state.messages.append({"role": "system", "content": SYSTEM_PROMPT})
 else:
     st.session_state.messages[0]["content"] = SYSTEM_PROMPT
 
-# 8. STOP IF NO KEY
-if not st.session_state.api_key:
-    st.warning("⚠️ The crystal ball is locked. Please enter the Password (API Key) in the sidebar.")
-    st.stop()
-
 client = OpenAI(api_key=st.session_state.api_key)
 
-# 9. DISPLAY CHAT
+# 10. DISPLAY CHAT
 for msg in st.session_state.messages:
     if msg["role"] != "system":
         user_avatar = "👧" if msg["role"] == "user" else "🐈‍⬛"
         with st.chat_message(msg["role"], avatar=user_avatar):
             st.markdown(msg["content"])
 
-# 10. INPUT
-prompt_placeholder = f"Ask Midnight... (Tip: Tap 🎙️ on your keyboard to speak!)"
+# 11. INPUT
+prompt_placeholder = f"Ask Midnight... (Tip: Tap 🎤 on your keyboard to speak!)"
 
 if user_input := st.chat_input(prompt_placeholder):
     st.session_state.messages.append({"role": "user", "content": user_input})
